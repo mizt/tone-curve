@@ -1,0 +1,531 @@
+<!DOCTYPE html>
+<html>
+	<head>
+		<title>tone-curve</title>
+		<meta charset="utf-8">
+		<meta name="robots" content="noindex, nofollow">
+		<link rel="icon" href="data:;base64,=">
+		<meta name="viewport" content="width=device-width, user-scalable=no, minimum-scale=1.0, maximum-scale=1.0">
+		<style>
+			
+			* {
+				margin:0;
+				padding:0;
+				-webkit-user-select:none;
+				-moz-user-select:none;
+				-ms-user-select:none;
+			}
+			
+			body {
+				font-family:Helvetica,sans-serif;
+				background:#808080;
+				width:100dvw;
+				height:100dvh;
+				overflow:hidden;
+			}
+			
+			p {
+				color:#111;
+				padding:6px;
+			}
+			
+			canvas {
+			}
+			
+		</style>
+	</head>
+	<body>
+		<script src="./twgl.min.js"></script>
+		<script type="module">
+						
+			if(("onmousedown" in document.documentElement)) {
+				
+				const X = 0;
+				const Y = 1;
+				
+				const width = 1920<<1;
+				const height = 1080<<1;
+				
+				const LUT = {
+					canvas:document.createElement("canvas")
+				};
+				LUT.canvas.width = 256;
+				LUT.canvas.height = 1;
+				LUT.ctx = LUT.canvas.getContext("2d");
+				const imageData = LUT.ctx.createImageData(256,1);
+				const p = imageData.data;
+				for(var i=0; i<256; i++) {
+					p[i*4+0] = i;
+					p[i*4+3] = 0xFF;
+				}
+				LUT.ctx.putImageData(imageData,0,0);
+								
+				const M = 5;
+				const L = 255+1;
+				const R = 4/255;
+				
+				const GUI = {
+					canvas:document.createElement("canvas")
+				};
+				GUI.canvas.width  = M*2+L;
+				GUI.canvas.height = M*2+L;
+								
+				const canvas = document.createElement("canvas");
+				Object.assign(canvas,{width:width,height:height});
+				Object.assign(canvas.style,{"vertical-align":"top"});
+				
+				const div = document.createElement("div");
+				Object.assign(div.style,{"display":"flex","width":"100vw","height":"100dvh"});
+				div.appendChild(canvas);
+			
+				const gl = canvas.getContext("experimental-webgl",{antialias:true});
+				
+				const vs = `
+	uniform mat4 PM; 
+	attribute vec3 position; 
+	attribute vec2 texcoord;
+	varying vec2 v_texcoord;
+	void main() { 
+		gl_Position = PM*vec4(vec3(position),1.0); 
+		v_texcoord = texcoord;
+	}`;
+				const fs = `
+	precision mediump float; 
+	uniform sampler2D u_texture;
+	uniform sampler2D u_lut;
+	varying vec2 v_texcoord;
+	void main() {
+		vec3 rgb = texture2D(u_texture,v_texcoord).xyz;
+		gl_FragColor = vec4(texture2D(u_lut,vec2(rgb.x,1)).x,texture2D(u_lut,vec2(rgb.y,1)).x,texture2D(u_lut,vec2(rgb.z,1)).x,1.0);
+	}`
+				
+				const program = twgl.createProgramFromSources(gl,[vs,fs]);
+							
+				if(program) {
+					
+					const fov = 60;
+					const near = 0.01;
+					const far = 1000.0;
+					
+					const z = 1.0/Math.tan((fov*0.5)*(Math.PI/180.0));
+									
+					const programInfo = twgl.createProgramInfoFromProgram(gl,program);
+					const bufferInfo = twgl.createBufferInfoFromArrays(gl,{
+						position: { numComponents:3, data:[
+							-1,-1,-z,
+							1,-1,-z,
+							1, 1,-z,
+							-1, 1,-z
+						]},
+						texcoord: { numComponents:2, data:[
+							0,1,
+							1,1,
+							1,0,
+							0,0
+						]},
+						indices:{ numComponents:3, data:[
+							0, 1, 2, 
+							0, 2, 3,
+						]},
+					});
+					
+					twgl.setDefaults({textureColor:[0,0,0,0]});
+					
+					const uniforms = {
+						PM:[
+							z,0,0,0,
+							0,z,0,0,0,
+							0,-((far+near)/(far-near)),-1,
+							0,0,-((2.0*far*near)/(far-near)),0
+						],
+						u_texture:twgl.createTexture(gl,{
+							min:gl.NEAREST,
+							mag:gl.NEAREST,
+							wrap:gl.CLAMP_TO_EDGE,
+							format:gl.RGBA,
+							src:"1738237323.jpg"
+						}),
+						u_lut:twgl.createTexture(gl,{
+							min:gl.NEAREST,
+							mag:gl.NEAREST,
+							wrap:gl.CLAMP_TO_EDGE,
+							format:gl.RGBA,
+							src:LUT.canvas
+						})
+					};
+								
+					const draw = function (e) {
+						
+						gl.viewport(0,0,width,height);
+						gl.enable(gl.DEPTH_TEST);
+						
+						gl.clearColor(0.0,0.0,0.0,0.0);
+						gl.clear(gl.COLOR_BUFFER_BIT|gl.DEPTH_BUFFER_BIT);
+						
+						gl.useProgram(program);
+						twgl.setBuffersAndAttributes(gl,programInfo,bufferInfo);
+						twgl.setUniforms(programInfo,uniforms);
+						gl.drawElements(gl.TRIANGLES,bufferInfo.numElements,gl.UNSIGNED_SHORT,0);
+					}
+					
+					GUI.ctx = GUI.canvas.getContext("2d");
+					
+					GUI.ctx.fillStyle = "#FFF";
+					GUI.ctx.fillRect(0,0,GUI.canvas.width,GUI.canvas.height);
+					
+					Object.assign(GUI.canvas.style,{
+						"position":"absolute",
+						zIndex:100,
+						right:0,
+						top:0
+					});
+					
+					let points = [[0,1],[1,0]]; 
+					
+					const target = {
+						canvas:null,
+						points:null,
+					}
+					
+					let then = Date.now();
+					
+					const update = function(ctx,arr) {
+						
+						ctx.clearRect(0,0,(M*2+L),(M*2+L));
+						
+						ctx.fillStyle = "#FFF";
+						ctx.fillRect(M,M,L,L);
+						
+						let lines = [];
+						if(arr[0][0]!=0) {
+							lines.push([0,arr[0][1]]);
+						}
+						for(var k=0; k<arr.length; k++) {
+							lines.push([...arr[k]]);
+						}
+						if(arr[arr.length-1][0]!=1) {
+							lines.push([1,arr[arr.length-1][1]]);
+						}
+						
+						ctx.lineWidth = 1;
+						
+						ctx.strokeStyle = "#DDD";
+						ctx.beginPath();
+						for(var k=0; k<4; k++) {
+							ctx.moveTo(M+((k*(L/4))>>0),M);
+							ctx.lineTo(M+((k*(L/4))>>0),M+L);
+						}
+						
+						for(var k=0; k<4; k++) {
+							ctx.moveTo(M,M+((k*(L/4))>>0));
+							ctx.lineTo(M+L,M+((k*(L/4))>>0));
+						}
+						
+						ctx.moveTo(M+L,M);
+						ctx.lineTo(M,M+L);
+												
+						ctx.stroke();
+						
+						ctx.lineWidth = 1.5;
+						ctx.strokeStyle = "#7BC";
+						ctx.beginPath();
+						
+						if(false) {
+							
+							ctx.moveTo(
+								M+lines[0][0]*L,
+								M+lines[0][1]*L
+							);
+							for(var k=1; k<lines.length; k++) {
+								ctx.lineTo(
+									M+lines[k][0]*L,
+									M+lines[k][1]*L
+								);
+							}
+							
+						}
+						else {
+							
+							// GPL-3.0
+							// https://github.com/RawTherapee/RawTherapee/blob/dev/rtengine/diagonalcurves.cc
+							
+							const N = arr.length;
+							let u = new Array(N-1);
+							let y = new Array(N);
+							
+							y[0] = u[0] = 0.0; 
+							
+							for(var i=1; i<N-1; i++) {
+								const sig = (arr[i][X]-arr[i-1][X])/(arr[i+1][X]-arr[i-1][X]);
+								const p = sig*y[i-1]+2.0;
+								y[i] = (sig-1.0)/p;
+								u[i] = ((arr[i+1][Y]-arr[i][Y])/(arr[i+1][X]-arr[i][X])-(arr[i][Y]-arr[i-1][Y])/(arr[i][X]-arr[i-1][X]));
+								u[i] = (6.0*u[i]/(arr[i+1][X]-arr[i-1][X])-sig*u[i-1])/p;
+							}
+							
+							y[N-1] = 0.0;
+							
+							for(var i=N-2; i>=0; i--) {
+								y[i] = y[i]*y[i+1]+u[i];
+							}
+							
+							const imageData = LUT.ctx.createImageData(256,1);
+							const p = imageData.data;
+							
+							for(var i=0; i<256; i++) {
+								
+								let t = i/255.0;
+								
+								let k_lo = 0;
+								let k_hi = N-1;
+								
+								let r = 0;
+								
+								if (t>arr[N-1][X]) {
+									r = arr[N-1][Y];
+								} 
+								else if (t<arr[0][X]) {
+									r = arr[0][Y];
+								}
+								else {
+									
+									while(k_hi>1+k_lo) {
+										let k = ((k_hi+k_lo)/2)>>0;
+										if(arr[k][X]>t) {
+											k_hi = k;
+										} 
+										else {
+											k_lo = k;
+										}
+									}
+									
+									const h = arr[k_hi][X]-arr[k_lo][X];
+									const a = (arr[k_hi][X]-t)/h;
+									const b = (t-arr[k_lo][X])/h;
+									r = a*arr[k_lo][Y]+b*arr[k_hi][Y]+((a*a*a-a)*y[k_lo]+(b*b*b-b)*y[k_hi])*(h*h)*0.1666666666666666666666666666666;
+									
+								}
+								
+								if(r<=0) r = 0;
+								if(r>=1) r = 1;
+								
+								p[i*4+0] = 0xFF-r*0xFF;
+								p[i*4+3] = 0xFF;
+								
+								if(i==0) {
+									ctx.moveTo(
+										M+i,
+										M+r*L
+									);
+								}
+								else {
+									ctx.lineTo(
+										M+i,
+										M+r*L
+									);
+								}
+							}
+							
+							
+							LUT.ctx.putImageData(imageData,0,0);
+							
+							gl.bindTexture(gl.TEXTURE_2D,uniforms.u_lut)
+							gl.texImage2D(gl.TEXTURE_2D,0,gl.RGB,gl.RGB,gl.UNSIGNED_BYTE,LUT.canvas);
+							gl.bindTexture(gl.TEXTURE_2D, null);
+
+						}
+						
+						ctx.stroke();
+						
+						ctx.fillStyle = "#009";
+						for(var k=0; k<arr.length; k++) {
+							ctx.fillRect(
+								M+arr[k][0]*L-3,
+								M+arr[k][1]*L-3,
+								6,6
+							);
+						}
+					}
+					
+					const onMouseUp = function() {
+						
+						target.canvas = null;
+						target.contex = null;
+						target.points = null;
+						target.select = null;
+						
+					}
+					
+					const onMouseMove = function(x,y) {
+						
+						if(target.canvas) {
+							
+							var current = Date.now();
+							if(current-then<33) return; 
+							then = current;
+							
+							const rect = GUI.canvas.getBoundingClientRect();
+							x-=rect.left;
+							y-=rect.top;
+							x-=M;
+							y-=M;
+							
+							if(x<0) x = 0;
+							if(y<0) y = 0;
+							if(x>L-1) x = L-1;
+							if(y>L-1) y = L-1;
+							
+							let px = x/255.0;
+							let py = y/255.0;
+							
+							if(px>=0&&px<=1&&py>=0&&py<=1) {
+								
+								let remove = false;
+								
+								const left = (target.select-1);
+								if(left>=0) {
+									if(px<=target.points[left][0]+R) {
+										if(Math.abs(target.points[left][1]-py)<=R) {
+											remove = true;
+										}
+										px = target.points[left][0]+R;
+									}
+								}
+								
+								const right = (target.select+1);
+								if(right<target.points.length) {
+									if(px>=target.points[right][0]-R) {
+										if(Math.abs(target.points[right][1]-py)<=R) {
+											remove = true;
+										}
+										px = target.points[right][0]-R;
+									}
+								}
+								
+								if(remove) {
+									target.points.splice(target.select,1);
+									update(target.contex,target.points);
+									onMouseUp();
+								}
+								else {
+									target.points[target.select] = [px,py];
+									update(target.contex,target.points);
+								}
+							}
+						}
+					}
+					
+					const onMouseDown = function(x,y) {
+						
+						const rect = GUI.canvas.getBoundingClientRect();
+						x-=rect.left;
+						y-=rect.top;
+						
+						if(x>=0&&x<M*2+L&&y>=0&&y<=M*2+L) {
+							
+							x-=M;
+							y-=M;
+							
+							if(x<0) x = 0;
+							if(y<0) y = 0;
+							
+							if(x>L-1) x = L-1;
+							if(y>L-1) y = L-1;
+							
+							const px = x/255.0;
+							const py = y/255.0;
+							
+							let select = -1;
+							
+							for(var k=0; k<points.length; k++) {
+								const dx = Math.abs(points[k][0]-px);
+								if(dx<=R) {
+									points[k][1] = py;
+									select = k;
+									break;
+								}
+							}
+							
+							if(select==-1) {
+								
+								for(var k=0; k<points.length; k++) {
+									if(points[k][0]<px) {
+										select = k;
+									}
+								}
+								
+								if(select!=-1) {
+									select++;
+									points.splice(select,0,[px,py]);
+								}
+							}
+							
+							if(select!=-1) {
+								target.canvas = GUI.canvas;
+								target.contex = GUI.ctx;
+								target.points = points;
+								target.select = select;
+								then = Date.now();
+								update(target.contex,target.points);
+							}
+							else {
+								onMouseUp();
+							}
+						}
+						else {
+							onMouseUp();
+						}
+						
+					};
+					
+					update(GUI.ctx,points);
+					
+					setInterval(draw,33);
+					draw();
+					
+					window.addEventListener("mousedown",function(e) {
+						onMouseDown(e.pageX,e.pageY);
+					});
+					
+					window.addEventListener("mousemove",function(e) {
+						onMouseMove(e.pageX,e.pageY);
+					});
+					
+					window.addEventListener("mouseup",function(e) {
+						onMouseUp();
+					});
+					
+					const resize = (e)=>{
+						const sx = window.innerWidth/width;
+						const sy = window.innerHeight/height;
+						if(sx<sy) {
+							Object.assign(canvas.style,{"width":"100dvw","height":"auto","margin":"auto 0"});
+						}
+						else {
+							Object.assign(canvas.style,{"width":"auto","height":"100dvh","margin":"0 auto"});
+						}
+					}
+					
+					let tid = 0;
+					window.addEventListener("resize",(e)=>{
+						if(tid) clearTimeout(tid);
+						tid = setTimeout((e)=>resize(),15);
+					});
+					
+					resize();
+					document.body.appendChild(div);
+					document.body.appendChild(GUI.canvas);
+					
+				}
+			}
+			else {
+				
+				const p = document.createElement("p");
+				p.textContent = "This device is not supported.";
+				document.body.appendChild(p);
+				
+			}
+			
+		</script>
+	</body>
+</html>
