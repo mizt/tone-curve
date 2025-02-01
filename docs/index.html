@@ -32,10 +32,20 @@
 			canvas {
 			}
 			
+			div#GUI {
+				position:absolute;
+				z-index:1024;
+				top:0;
+				right:0;
+				width:266;
+			}
+			
 		</style>
 	</head>
 	<body>
 		<script src="./twgl.min.js"></script>
+		<div id=GUI>
+		</div>
 		<script type="module">
 						
 			if(("onmousedown" in document.documentElement)) {
@@ -43,26 +53,44 @@
 				const X = 0;
 				const Y = 1;
 				
+				const M = 5;
+				const L = 255+1;
+				const R = 4/255;
+				
+				
 				const width = 1920<<1;
 				const height = 1080<<1;
 				
 				const LUT = {
 					canvas:document.createElement("canvas")
 				};
-				LUT.canvas.width = 256;
-				LUT.canvas.height = 1;
+				LUT.canvas.width = L;
+				LUT.canvas.height = 4; // 3*4 = 12 
 				LUT.ctx = LUT.canvas.getContext("2d");
-				const imageData = LUT.ctx.createImageData(256,1);
+				const imageData = LUT.ctx.getImageData(0,0,256,4);
 				const p = imageData.data;
-				for(var i=0; i<256; i++) {
-					p[i*4+0] = i;
-					p[i*4+3] = 0xFF;
+				for(var j=0; j<L; j++) {
+					p[0*(L<<2)+j*4+0] = j;
+					p[0*(L<<2)+j*4+1] = j;
+					p[0*(L<<2)+j*4+2] = j;
+					p[0*(L<<2)+j*4+3] = 0xFF;
+					p[1*(L<<2)+j*4+0] = j;
+					p[1*(L<<2)+j*4+1] = j;
+					p[1*(L<<2)+j*4+2] = j;
+					p[1*(L<<2)+j*4+3] = 0xFF;
+					p[2*(L<<2)+j*4+0] = j;
+					p[2*(L<<2)+j*4+1] = j;
+					p[2*(L<<2)+j*4+2] = j;
+					p[2*(L<<2)+j*4+3] = 0xFF;
+					p[3*(L<<2)+j*4+0] = j;
+					p[3*(L<<2)+j*4+1] = j;
+					p[3*(L<<2)+j*4+2] = j;
+					p[3*(L<<2)+j*4+3] = 0xFF;
+					
 				}
 				LUT.ctx.putImageData(imageData,0,0);
 								
-				const M = 5;
-				const L = 255+1;
-				const R = 4/255;
+			
 				
 				const GUI = {
 					canvas:document.createElement("canvas")
@@ -96,7 +124,8 @@
 	varying vec2 v_texcoord;
 	void main() {
 		vec3 rgb = texture2D(u_texture,v_texcoord).xyz;
-		gl_FragColor = vec4(texture2D(u_lut,vec2(rgb.x,1)).x,texture2D(u_lut,vec2(rgb.y,1)).x,texture2D(u_lut,vec2(rgb.z,1)).x,1.0);
+
+		gl_FragColor = vec4(texture2D(u_lut,vec2(rgb.x,0.0)).x,texture2D(u_lut,vec2(rgb.y,0.0)).x,texture2D(u_lut,vec2(rgb.z,0.0)).x,1.0);
 	}`
 				
 				const program = twgl.createProgramFromSources(gl,[vs,fs]);
@@ -172,13 +201,6 @@
 					
 					GUI.ctx.fillStyle = "#FFF";
 					GUI.ctx.fillRect(0,0,GUI.canvas.width,GUI.canvas.height);
-					
-					Object.assign(GUI.canvas.style,{
-						"position":"absolute",
-						zIndex:100,
-						right:0,
-						top:0
-					});
 					
 					let points = [[0,1],[1,0]]; 
 					
@@ -269,12 +291,12 @@
 								y[i] = y[i]*y[i+1]+u[i];
 							}
 							
-							const imageData = LUT.ctx.createImageData(256,1);
+							const imageData = LUT.ctx.getImageData(0,0,256,1);
 							const p = imageData.data;
 							
-							for(var i=0; i<256; i++) {
+							for(var j=0; j<L; j++) {
 								
-								let t = i/255.0;
+								let t = j/255.0;
 								
 								let k_lo = 0;
 								let k_hi = N-1;
@@ -303,29 +325,26 @@
 									const a = (arr[k_hi][X]-t)/h;
 									const b = (t-arr[k_lo][X])/h;
 									r = a*arr[k_lo][Y]+b*arr[k_hi][Y]+((a*a*a-a)*y[k_lo]+(b*b*b-b)*y[k_hi])*(h*h)*0.1666666666666666666666666666666;
-									
 								}
 								
 								if(r<=0) r = 0;
 								if(r>=1) r = 1;
 								
-								p[i*4+0] = 0xFF-r*0xFF;
-								p[i*4+3] = 0xFF;
+								p[0*(L<<2)*4+j*4+0] = 255-(r*255);
 								
-								if(i==0) {
+								if(j==0) {
 									ctx.moveTo(
-										M+i,
+										M+j,
 										M+r*L
 									);
 								}
 								else {
 									ctx.lineTo(
-										M+i,
+										M+j,
 										M+r*L
 									);
 								}
 							}
-							
 							
 							LUT.ctx.putImageData(imageData,0,0);
 							
@@ -514,7 +533,13 @@
 					
 					resize();
 					document.body.appendChild(div);
-					document.body.appendChild(GUI.canvas);
+					
+					document.body.appendChild(document.getElementById("GUI"));
+					document.getElementById("GUI").appendChild(GUI.canvas);
+					
+					
+					
+					//document.body.appendChild(GUI.canvas);
 					
 				}
 			}
