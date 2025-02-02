@@ -341,7 +341,6 @@
 						if(enable[index]) {
 							
 							ctx.strokeStyle = "#7BC";
-
 							
 							// GPL-3.0
 							// https://github.com/RawTherapee/RawTherapee/blob/dev/rtengine/diagonalcurves.cc
@@ -458,14 +457,16 @@
 						}
 						
 						if(enable[index]) {
-							ctx.fillStyle = "#F44";
-							ctx.fillRect(M[0]+6,M[2]+6,9,9);
-							
+							ctx.fillStyle = "#4C4";
 						}
 						else {
 							ctx.fillStyle = "#BBB";
-							ctx.fillRect(M[0]+6,M[2]+6,9,9);
 						}
+						
+						ctx.beginPath();
+						ctx.arc(M[0]+12,M[2]+12,6,0,2*Math.PI);
+						ctx.closePath();
+						ctx.fill(); 
 					}
 					
 					const getIndex = (c)=>{
@@ -562,8 +563,8 @@
 							x/=(255.0/(level+1));
 							y/=(255.0/(level+1));
 							
-							if(6/255.0<x&&x<15/255.0) {
-								if(6/255.0<y&&y<15/255.0) {
+							if(6/255.0<x&&x<18/255.0) {
+								if(6/255.0<y&&y<18/255.0) {
 									enable[index] = !enable[index];
 									update(context[index],points[index],index);
 									onMouseUp();
@@ -571,47 +572,53 @@
 								}
 							}
 							
-							if(x<0) x = 0;
-							if(y<0) y = 0;
-							
-							if(x>1.0) x = 1.0;
-							if(y>1.0) y = 1.0;
-							
-							if(x>=0.0&&x<=1.0&&y>=0&&y<=1.0) {
-																
-								let select = -1;
+							if(enable[index]) {
 								
-								for(var k=0; k<points[index].length; k++) {
-									const dx = Math.abs(points[index][k][X]-x);
-									if(dx<=R) {
-										points[index][k][Y] = y;
-										select = k;
-										break;
-									}
-								}
+								if(x<0) x = 0;
+								if(y<0) y = 0;
 								
-								if(select==-1) {
+								if(x>1.0) x = 1.0;
+								if(y>1.0) y = 1.0;
+								
+								if(x>=0.0&&x<=1.0&&y>=0&&y<=1.0) {
+									
+									let select = -1;
 									
 									for(var k=0; k<points[index].length; k++) {
-										if(x<points[index][k][X]) {
+										const dx = Math.abs(points[index][k][X]-x);
+										if(dx<=R) {
+											points[index][k][Y] = y;
 											select = k;
 											break;
 										}
 									}
 									
-									if(points[index][points[index].length-1][X]<x) {
-										select = points[index].length;
+									if(select==-1) {
+										
+										for(var k=0; k<points[index].length; k++) {
+											if(x<points[index][k][X]) {
+												select = k;
+												break;
+											}
+										}
+										
+										if(points[index][points[index].length-1][X]<x) {
+											select = points[index].length;
+										}
+										
+										if(select!=-1) {
+											points[index].splice(select,0,[x,y]);
+										}
 									}
 									
 									if(select!=-1) {
-										points[index].splice(select,0,[x,y]);
+										target.select = select;
+										then = Date.now();
+										update(context[index],points[index],index);
 									}
-								}
-								
-								if(select!=-1) {
-									target.select = select;
-									then = Date.now();
-									update(context[index],points[index],index);
+									else {
+										onMouseUp();
+									}
 								}
 								else {
 									onMouseUp();
