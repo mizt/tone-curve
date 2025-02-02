@@ -1,35 +1,19 @@
 <!DOCTYPE html>
 <html>
 	<head>
-		<title>tone-curve</title>
-		<meta charset="utf-8">
-		<meta name="robots" content="noindex, nofollow">
-		<link rel="icon" href="data:;base64,=">
-		<meta name="viewport" content="width=device-width, user-scalable=no, minimum-scale=1.0, maximum-scale=1.0">
+		<meta charset="UTF-8">
+		<title></title>
 		<style>
 			
 			* {
 				margin:0;
 				padding:0;
-				-webkit-user-select:none;
-				-moz-user-select:none;
-				-ms-user-select:none;
 			}
 			
 			body {
 				font-family:Helvetica,sans-serif;
-				background:#808080;
-				width:100dvw;
-				height:100dvh;
 				overflow:hidden;
-			}
-			
-			p {
-				color:#111;
-				padding:6px;
-			}
-			
-			canvas {
+				background:#808080;
 			}
 			
 			div#GUI {
@@ -37,77 +21,135 @@
 				z-index:1024;
 				top:0;
 				right:0;
-				width:266;
+				width:270px;
+				overflow-y:scroll;
+			}
+			
+			div#ToneCurve {
+				background-color:#EEE;
+			}
+			
+			div#GUI::-webkit-scrollbar{
+				display:none;
+			}
+			
+			canvas {
+				vertical-align:top;
+				background-color:#FFF;
+			}
+			
+			p {
+				color:#111;
+				padding:6px;
 			}
 			
 		</style>
 	</head>
 	<body>
 		<script src="./twgl.min.js"></script>
-		<div id=GUI>
-		</div>
-		<script type="module">
-						
-			if(("onmousedown" in document.documentElement)) {
+		<script>
+
+			const TEXTURE_URL = "./1738237323.jpg";
+			
+			const X = 0;
+			const Y = 1;
+			
+			const MAX_TEXTURE = 12;
+
+			const TEXTURE_SIZE = [3840,2160];
+
+			const load = (texture)=>{
 				
-				const X = 0;
-				const Y = 1;
+				const enable = new Array(MAX_TEXTURE);
+				for(var n=0; n<MAX_TEXTURE; n++) enable[n] = false;
+
+				const rows = texture.naturalWidth/TEXTURE_SIZE[X];
+				const cols = texture.naturalHeight/TEXTURE_SIZE[Y];
+								
+				const check = document.createElement("canvas");
+				check.width = rows*8;
+				check.height = cols*8;
 				
-				const M = 5;
+				check.getContext("2d").drawImage(texture,0,0,check.width,check.height);
+				const data = check.getContext("2d").getImageData(0,0,check.width,check.height).data;
+
+				for(var i=0; i<cols; i++) {
+					for(var j=0; j<rows; j++) {
+						let num = 0;
+						for(var i2=1; i2<(8-1); i2++) {
+							for(var j2=1; j2<(8-1); j2++) {
+								const offset = (i*8+i2)*check.width*4+(j*8+j2)*4;
+								if(data[offset+0]==0&&data[offset+2]==0) {
+									let g = data[offset+1];
+									if(135-2<=g&&g<=135+2) {
+										num++;
+									}
+								}
+							}
+						}
+						if(num!=36) {
+							enable[j*cols+i] = true;
+						}
+					}
+				}
+				
+				const TEXTURE_NUM = enable.filter(Boolean).length;
+				console.log("TEXTURE_NUM = ",TEXTURE_NUM);
+				
+				const M = [7,7,4,4];
+				
 				const L = 255+1;
-				const R = 4/255;
+				const W = (M[0]+M[1])+L;
+				const H = (M[2]+M[3])+L;
+				
+				let then = 0;
 				
 				
-				const width = 1920<<1;
-				const height = 1080<<1;
+				const LEVEL = [270,135,90];
+				const LINE_WIDTH = [1,2,3];
+				const LINE_SCALE = [1.5,1.25,1];
+				
+				let level = 0;
+				let R = (4*(level+1))/255;
 				
 				const LUT = {
 					canvas:document.createElement("canvas")
 				};
 				LUT.canvas.width = L;
-				LUT.canvas.height = 4; // 3*4 = 12 
+				LUT.canvas.height = 12; // 3*4 = 12 
 				LUT.ctx = LUT.canvas.getContext("2d");
-				const imageData = LUT.ctx.getImageData(0,0,256,4);
+				const imageData = LUT.ctx.getImageData(0,0,256,12);
 				const p = imageData.data;
-				for(var j=0; j<L; j++) {
-					p[0*(L<<2)+j*4+0] = j;
-					p[0*(L<<2)+j*4+1] = j;
-					p[0*(L<<2)+j*4+2] = j;
-					p[0*(L<<2)+j*4+3] = 0xFF;
-					p[1*(L<<2)+j*4+0] = j;
-					p[1*(L<<2)+j*4+1] = j;
-					p[1*(L<<2)+j*4+2] = j;
-					p[1*(L<<2)+j*4+3] = 0xFF;
-					p[2*(L<<2)+j*4+0] = j;
-					p[2*(L<<2)+j*4+1] = j;
-					p[2*(L<<2)+j*4+2] = j;
-					p[2*(L<<2)+j*4+3] = 0xFF;
-					p[3*(L<<2)+j*4+0] = j;
-					p[3*(L<<2)+j*4+1] = j;
-					p[3*(L<<2)+j*4+2] = j;
-					p[3*(L<<2)+j*4+3] = 0xFF;
-					
+				for(var i=0; i<12; i++) {
+					for(var j=0; j<L; j++) {
+						p[i*(L<<2)+j*4+0] = 0;
+						p[i*(L<<2)+j*4+3] = 0xFF;
+					}
 				}
 				LUT.ctx.putImageData(imageData,0,0);
-								
-			
 				
-				const GUI = {
-					canvas:document.createElement("canvas")
-				};
-				GUI.canvas.width  = M*2+L;
-				GUI.canvas.height = M*2+L;
-								
-				const canvas = document.createElement("canvas");
-				Object.assign(canvas,{width:width,height:height});
-				Object.assign(canvas.style,{"vertical-align":"top"});
+				const GUI = document.createElement("div");
+				GUI.id = "GUI";
 				
-				const div = document.createElement("div");
-				Object.assign(div.style,{"display":"flex","width":"100vw","height":"100dvh"});
-				div.appendChild(canvas);
-			
-				const gl = canvas.getContext("experimental-webgl",{antialias:true});
+				const ToneCurve = document.createElement("div");
+				ToneCurve.id = "ToneCurve";
 				
+				const target = {
+					canvas:null,
+					select:-1,
+				}
+				
+				const canvas = new Array(MAX_TEXTURE);
+				const context = new Array(MAX_TEXTURE);
+				const points = new Array(MAX_TEXTURE);
+				
+				const view = document.createElement("canvas");
+				view.width = TEXTURE_SIZE[0];
+				view.height = TEXTURE_SIZE[1];
+				view.style.background = "#888";
+				
+				const gl = view.getContext("experimental-webgl",{antialias:true});
+
 				const vs = `
 	uniform mat4 PM; 
 	attribute vec3 position; 
@@ -121,15 +163,84 @@
 	precision mediump float; 
 	uniform sampler2D u_texture;
 	uniform sampler2D u_lut;
+	uniform float u_texture_num;
 	varying vec2 v_texcoord;
 	void main() {
-		vec3 rgb = texture2D(u_texture,v_texcoord).xyz;
 
-		gl_FragColor = vec4(texture2D(u_lut,vec2(rgb.x,0.0)).x,texture2D(u_lut,vec2(rgb.y,0.0)).x,texture2D(u_lut,vec2(rgb.z,0.0)).x,1.0);
+		vec3 rgb = (0.5+(texture2D(u_texture,v_texcoord).xyz)*255.0)/256.0;
+
+		float x = v_texcoord.x;
+		float y = v_texcoord.y;
+
+		if(1.0<=u_texture_num&&u_texture_num<=12.0) {
+			
+			float pos = 0.0;
+
+			if(u_texture_num==1.0) {
+				pos = 0.5;
+			}
+			else if(u_texture_num==2.0) {
+				pos = (y<1.0/2.0)?0.5:1.5;
+			}
+			else if(u_texture_num==3.0) {
+				pos = (y<1.0/3.0)?0.5:(y<2.0/3.0)?1.5:2.5;
+			}
+			else if(u_texture_num==4.0||u_texture_num==5.0||u_texture_num==6.0) {
+				
+				if(y<1.0/3.0) {
+					pos = (x<1.0/2.0)?0.5:3.5;
+				}
+				else if(y<2.0/3.0) {
+					pos = (x<1.0/2.0)?1.5:4.5;
+				}
+				else {
+					pos = (x<1.0/2.0)?2.5:5.5;
+				}
+			}
+			else if(u_texture_num==7.0||u_texture_num==8.0||u_texture_num==9.0) {
+				
+				float v = (y<1.0/3.0)?0.0:(y<2.0/3.0)?1.0:2.0;
+
+				if(x<1.0/3.0) {
+					pos = v+0.5;
+				}
+				else if(x<2.0/3.0) {
+					pos = v+3.5;
+				}
+				else if(x<3.0/3.0) {
+					pos = v+6.5;
+				}
+
+			}
+			else if(u_texture_num==10.0||u_texture_num==11.0||u_texture_num==12.0) {
+	
+				float v = (y<1.0/3.0)?0.0:(y<2.0/3.0)?1.0:2.0;
+
+				if(x<1.0/4.0) {
+					pos = v+0.5;
+				}
+				else if(x<2.0/4.0) {
+					pos = v+3.5;
+				}
+				else if(x<3.0/4.0) {
+					pos = v+6.5;
+				}
+				else {
+					pos = v+9.5;
+				}
+			}
+
+			pos/=12.0;
+		
+			gl_FragColor = vec4(texture2D(u_lut,vec2(rgb.x,pos)).x,texture2D(u_lut,vec2(rgb.y,pos)).x,texture2D(u_lut,vec2(rgb.z,pos)).x,1.0);			
+		}
+		else {
+			
+			gl_FragColor = vec4(0.0,0.5294117647,0.0,1.0);
+		}
 	}`
 				
 				const program = twgl.createProgramFromSources(gl,[vs,fs]);
-							
 				if(program) {
 					
 					const fov = 60;
@@ -137,7 +248,7 @@
 					const far = 1000.0;
 					
 					const z = 1.0/Math.tan((fov*0.5)*(Math.PI/180.0));
-									
+					
 					const programInfo = twgl.createProgramInfoFromProgram(gl,program);
 					const bufferInfo = twgl.createBufferInfoFromArrays(gl,{
 						position: { numComponents:3, data:[
@@ -172,7 +283,7 @@
 							mag:gl.NEAREST,
 							wrap:gl.CLAMP_TO_EDGE,
 							format:gl.RGBA,
-							src:"1738237323.jpg"
+							src:texture
 						}),
 						u_lut:twgl.createTexture(gl,{
 							min:gl.NEAREST,
@@ -180,43 +291,16 @@
 							wrap:gl.CLAMP_TO_EDGE,
 							format:gl.RGBA,
 							src:LUT.canvas
-						})
+						}),
+						u_texture_num:TEXTURE_NUM
 					};
-								
-					const draw = function (e) {
+					
+					const update = (ctx,arr,index)=>{
 						
-						gl.viewport(0,0,width,height);
-						gl.enable(gl.DEPTH_TEST);
-						
-						gl.clearColor(0.0,0.0,0.0,0.0);
-						gl.clear(gl.COLOR_BUFFER_BIT|gl.DEPTH_BUFFER_BIT);
-						
-						gl.useProgram(program);
-						twgl.setBuffersAndAttributes(gl,programInfo,bufferInfo);
-						twgl.setUniforms(programInfo,uniforms);
-						gl.drawElements(gl.TRIANGLES,bufferInfo.numElements,gl.UNSIGNED_SHORT,0);
-					}
-					
-					GUI.ctx = GUI.canvas.getContext("2d");
-					
-					GUI.ctx.fillStyle = "#FFF";
-					GUI.ctx.fillRect(0,0,GUI.canvas.width,GUI.canvas.height);
-					
-					let points = [[0,1],[1,0]]; 
-					
-					const target = {
-						canvas:null,
-						points:null,
-					}
-					
-					let then = Date.now();
-					
-					const update = function(ctx,arr) {
-						
-						ctx.clearRect(0,0,(M*2+L),(M*2+L));
+						ctx.clearRect(0,0,((M[0]+M[1])+L),((M[2]+M[3])+L));
 						
 						ctx.fillStyle = "#FFF";
-						ctx.fillRect(M,M,L,L);
+						ctx.fillRect(M[0],M[2],L,L);
 						
 						let lines = [];
 						if(arr[0][0]!=0) {
@@ -229,44 +313,35 @@
 							lines.push([1,arr[arr.length-1][1]]);
 						}
 						
-						ctx.lineWidth = 1;
+						ctx.lineWidth = LINE_WIDTH[level];
 						
-						ctx.strokeStyle = "#DDD";
+						ctx.strokeStyle = "#CCC";
 						ctx.beginPath();
-						for(var k=0; k<4; k++) {
-							ctx.moveTo(M+((k*(L/4))>>0),M);
-							ctx.lineTo(M+((k*(L/4))>>0),M+L);
+						for(var k=0; k<=4; k++) {
+							ctx.moveTo(M[0]+((k*(L/4))>>0),M[2]);
+							ctx.lineTo(M[0]+((k*(L/4))>>0),M[2]+L);
 						}
 						
-						for(var k=0; k<4; k++) {
-							ctx.moveTo(M,M+((k*(L/4))>>0));
-							ctx.lineTo(M+L,M+((k*(L/4))>>0));
+						for(var k=0; k<=4; k++) {
+							ctx.moveTo(M[0],M[2]+((k*(L/4))>>0));
+							ctx.lineTo(M[0]+L,M[2]+((k*(L/4))>>0));
 						}
 						
-						ctx.moveTo(M+L,M);
-						ctx.lineTo(M,M+L);
-												
+						ctx.moveTo(M[0]+L,M[2]);
+						ctx.lineTo(M[0],M[2]+L);
+						
 						ctx.stroke();
 						
-						ctx.lineWidth = 1.5;
-						ctx.strokeStyle = "#7BC";
+						ctx.lineWidth = LINE_WIDTH[level]*LINE_SCALE[level];
 						ctx.beginPath();
 						
-						if(false) {
+						const imageData = LUT.ctx.getImageData(0,0,256,12);
+						const p = imageData.data;
+						
+						if(enable[index]) {
 							
-							ctx.moveTo(
-								M+lines[0][0]*L,
-								M+lines[0][1]*L
-							);
-							for(var k=1; k<lines.length; k++) {
-								ctx.lineTo(
-									M+lines[k][0]*L,
-									M+lines[k][1]*L
-								);
-							}
-							
-						}
-						else {
+							ctx.strokeStyle = "#7BC";
+
 							
 							// GPL-3.0
 							// https://github.com/RawTherapee/RawTherapee/blob/dev/rtengine/diagonalcurves.cc
@@ -290,9 +365,6 @@
 							for(var i=N-2; i>=0; i--) {
 								y[i] = y[i]*y[i+1]+u[i];
 							}
-							
-							const imageData = LUT.ctx.getImageData(0,0,256,1);
-							const p = imageData.data;
 							
 							for(var j=0; j<L; j++) {
 								
@@ -330,162 +402,220 @@
 								if(r<=0) r = 0;
 								if(r>=1) r = 1;
 								
-								p[0*(L<<2)*4+j*4+0] = 255-(r*255);
+								p[index*(L<<2)+j*4+0] = 255-(r*255);
 								
 								if(j==0) {
 									ctx.moveTo(
-										M+j,
-										M+r*L
+										M[0]+j,
+										M[2]+r*L
 									);
 								}
 								else {
 									ctx.lineTo(
-										M+j,
-										M+r*L
+										M[0]+j,
+										M[2]+r*L
 									);
 								}
 							}
 							
-							LUT.ctx.putImageData(imageData,0,0);
-							
-							gl.bindTexture(gl.TEXTURE_2D,uniforms.u_lut)
-							gl.texImage2D(gl.TEXTURE_2D,0,gl.RGB,gl.RGB,gl.UNSIGNED_BYTE,LUT.canvas);
-							gl.bindTexture(gl.TEXTURE_2D, null);
+							ctx.stroke();
+						}
+						else {
 
+							ctx.strokeStyle = "#999";
+
+							ctx.moveTo(
+								M[0],
+								M[2]+255
+							);
+							
+							ctx.lineTo(
+								M[0]+255,
+								M[2]
+							);
+							
+							ctx.stroke();
+							
+							
+							for(var j=0; j<L; j++) {
+								p[index*(L<<2)+j*4+0] = j;
+							}
 						}
 						
-						ctx.stroke();
+						LUT.ctx.putImageData(imageData,0,0);
+						
+						gl.bindTexture(gl.TEXTURE_2D,uniforms.u_lut)
+						gl.texImage2D(gl.TEXTURE_2D,0,gl.RGB,gl.RGB,gl.UNSIGNED_BYTE,LUT.canvas);
+						gl.bindTexture(gl.TEXTURE_2D, null);
 						
 						ctx.fillStyle = "#009";
 						for(var k=0; k<arr.length; k++) {
 							ctx.fillRect(
-								M+arr[k][0]*L-3,
-								M+arr[k][1]*L-3,
+								M[0]+arr[k][0]*L-3,
+								M[2]+arr[k][1]*L-3,
 								6,6
 							);
 						}
+						
+						if(enable[index]) {
+							ctx.fillStyle = "#F44";
+							ctx.fillRect(M[0]+6,M[2]+6,9,9);
+							
+						}
+						else {
+							ctx.fillStyle = "#BBB";
+							ctx.fillRect(M[0]+6,M[2]+6,9,9);
+						}
 					}
 					
-					const onMouseUp = function() {
-						
+					const getIndex = (c)=>{
+						let index = -1;
+						if(c) {
+							for(var n=0; n<MAX_TEXTURE; n++) {
+								if(c===canvas[n]) {
+									index = n;
+									break;
+								}
+							}
+						}
+						return index;
+					};
+					
+					const onMouseUp = ()=>{
 						target.canvas = null;
-						target.contex = null;
-						target.points = null;
-						target.select = null;
-						
-					}
+						target.select = -1;
+					};
 					
-					const onMouseMove = function(x,y) {
+					const onMouseMove = (x,y)=>{
 						
-						if(target.canvas) {
+						const current = Date.now();
+						if(current-then<33) return; 
+						then = current;
+						
+						const index = getIndex(target.canvas);
+						
+						if(index!==-1) {
 							
-							var current = Date.now();
-							if(current-then<33) return; 
-							then = current;
-							
-							const rect = GUI.canvas.getBoundingClientRect();
+							const rect = canvas[index].getBoundingClientRect();
 							x-=rect.left;
 							y-=rect.top;
-							x-=M;
-							y-=M;
+							x-=M[0]/(level+1);
+							y-=M[2]/(level+1);
+							x/=(255.0/(level+1));
+							y/=(255.0/(level+1));
 							
 							if(x<0) x = 0;
 							if(y<0) y = 0;
-							if(x>L-1) x = L-1;
-							if(y>L-1) y = L-1;
 							
-							let px = x/255.0;
-							let py = y/255.0;
+							if(x>1.0) x = 1.0;
+							if(y>1.0) y = 1.0;
 							
-							if(px>=0&&px<=1&&py>=0&&py<=1) {
+							if(x>=0.0&&x<=1.0&&y>=0&&y<=1.0) {
 								
 								let remove = false;
 								
 								const left = (target.select-1);
 								if(left>=0) {
-									if(px<=target.points[left][0]+R) {
-										if(Math.abs(target.points[left][1]-py)<=R) {
+									if(x<=points[index][left][X]+R) {
+										if(Math.abs(points[index][left][Y]-y)<=R) {
 											remove = true;
 										}
-										px = target.points[left][0]+R;
+										x = points[index][left][X]+R;
 									}
 								}
 								
 								const right = (target.select+1);
-								if(right<target.points.length) {
-									if(px>=target.points[right][0]-R) {
-										if(Math.abs(target.points[right][1]-py)<=R) {
+								if(right<points[index].length) {
+									if(x>=points[index][right][X]-R) {
+										if(Math.abs(points[index][right][Y]-y)<=R) {
 											remove = true;
 										}
-										px = target.points[right][0]-R;
+										x = points[index][right][X]-R;
 									}
 								}
 								
 								if(remove) {
-									target.points.splice(target.select,1);
-									update(target.contex,target.points);
+									points[index].splice(target.select,1);
 									onMouseUp();
 								}
 								else {
-									target.points[target.select] = [px,py];
-									update(target.contex,target.points);
+									points[index][target.select] = [x,y];
 								}
+								
+								update(context[index],points[index],index);
 							}
 						}
-					}
+						
+					};
 					
-					const onMouseDown = function(x,y) {
+					const onMouseDown = (x,y)=>{
 						
-						const rect = GUI.canvas.getBoundingClientRect();
-						x-=rect.left;
-						y-=rect.top;
+						const index = getIndex(target.canvas);
 						
-						if(x>=0&&x<M*2+L&&y>=0&&y<=M*2+L) {
+						if(index!==-1) {
 							
-							x-=M;
-							y-=M;
+							const rect = canvas[index].getBoundingClientRect();
+							x-=rect.left;
+							y-=rect.top;
+							x-=M[0]/(level+1);
+							y-=M[2]/(level+1);
+							x/=(255.0/(level+1));
+							y/=(255.0/(level+1));
+							
+							if(6/255.0<x&&x<15/255.0) {
+								if(6/255.0<y&&y<15/255.0) {
+									enable[index] = !enable[index];
+									update(context[index],points[index],index);
+									onMouseUp();
+									return;
+								}
+							}
 							
 							if(x<0) x = 0;
 							if(y<0) y = 0;
 							
-							if(x>L-1) x = L-1;
-							if(y>L-1) y = L-1;
+							if(x>1.0) x = 1.0;
+							if(y>1.0) y = 1.0;
 							
-							const px = x/255.0;
-							const py = y/255.0;
-							
-							let select = -1;
-							
-							for(var k=0; k<points.length; k++) {
-								const dx = Math.abs(points[k][0]-px);
-								if(dx<=R) {
-									points[k][1] = py;
-									select = k;
-									break;
-								}
-							}
-							
-							if(select==-1) {
+							if(x>=0.0&&x<=1.0&&y>=0&&y<=1.0) {
+																
+								let select = -1;
 								
-								for(var k=0; k<points.length; k++) {
-									if(points[k][0]<px) {
+								for(var k=0; k<points[index].length; k++) {
+									const dx = Math.abs(points[index][k][X]-x);
+									if(dx<=R) {
+										points[index][k][Y] = y;
 										select = k;
+										break;
+									}
+								}
+								
+								if(select==-1) {
+									
+									for(var k=0; k<points[index].length; k++) {
+										if(x<points[index][k][X]) {
+											select = k;
+											break;
+										}
+									}
+									
+									if(points[index][points[index].length-1][X]<x) {
+										select = points[index].length;
+									}
+									
+									if(select!=-1) {
+										points[index].splice(select,0,[x,y]);
 									}
 								}
 								
 								if(select!=-1) {
-									select++;
-									points.splice(select,0,[px,py]);
+									target.select = select;
+									then = Date.now();
+									update(context[index],points[index],index);
 								}
-							}
-							
-							if(select!=-1) {
-								target.canvas = GUI.canvas;
-								target.contex = GUI.ctx;
-								target.points = points;
-								target.select = select;
-								then = Date.now();
-								update(target.contex,target.points);
+								else {
+									onMouseUp();
+								}
 							}
 							else {
 								onMouseUp();
@@ -494,34 +624,90 @@
 						else {
 							onMouseUp();
 						}
-						
 					};
 					
-					update(GUI.ctx,points);
-					
-					setInterval(draw,33);
-					draw();
-					
-					window.addEventListener("mousedown",function(e) {
-						onMouseDown(e.pageX,e.pageY);
-					});
+					for(var n=0; n<MAX_TEXTURE; n++) {
+						canvas[n] = document.createElement("canvas");
+						canvas[n].width = W;
+						canvas[n].height = H;
+						canvas[n].style.background = "#EEE";
+						
+						context[n] = canvas[n].getContext("2d");
+						points[n] = [[0,1],[1,0]]; 
+						
+						canvas[n].addEventListener("mousedown",function(e) {
+							target.canvas = this;
+							onMouseDown(e.pageX,e.pageY);
+						});
+						
+						update(context[n],points[n],n);
+						ToneCurve.appendChild(canvas[n]);
+					}
 					
 					window.addEventListener("mousemove",function(e) {
-						onMouseMove(e.pageX,e.pageY);
+						if(target.canvas&&target.select!=-1) onMouseMove(e.pageX,e.pageY);
 					});
 					
 					window.addEventListener("mouseup",function(e) {
-						onMouseUp();
+						if(target.canvas&&target.select!=-1) onMouseUp();
 					});
 					
+					GUI.appendChild(ToneCurve);
+					
+					document.body.appendChild(GUI);
+					
 					const resize = (e)=>{
-						const sx = window.innerWidth/width;
-						const sy = window.innerHeight/height;
-						if(sx<sy) {
-							Object.assign(canvas.style,{"width":"100dvw","height":"auto","margin":"auto 0"});
+						
+						if(window.innerWidth<720||window.innerHeight<135) {
+							level = 2;
+						}
+						else if(window.innerWidth<1280||window.innerHeight<270) {
+							level = 1;
 						}
 						else {
-							Object.assign(canvas.style,{"width":"auto","height":"100dvh","margin":"0 auto"});
+							level = 0;
+						}
+						
+						R = (4*(level+1))/255;
+						
+						for(var n=0; n<MAX_TEXTURE; n++) {
+							canvas[n].style.width = canvas[n].style.height = LEVEL[level]+"px";
+						}
+						
+						GUI.style.width = LEVEL[level]+"px";
+						GUI.style.height = "100%";
+						
+						const padding = LINE_WIDTH[2-level];
+						
+						ToneCurve.style.paddingTop = padding+"px";
+						ToneCurve.style.paddingBottom = (padding+1)+"px";
+						
+						const sw = window.innerWidth-LEVEL[level];
+						
+						const sx = sw/view.width;
+						const sy = window.innerHeight/view.height;
+						
+						if(sx<sy) {
+							
+							const aspect = view.height/view.width;
+							
+							view.style.width = sw+"px";
+							view.style.height = (aspect*sw)+"px";
+							view.style.marginTop = ((window.innerHeight-(aspect*sw))>>1)+"px";
+							view.style.marginLeft = 0;
+						}
+						else {
+							
+							const aspect = view.width/view.height;
+							
+							view.style.height = window.innerHeight+"px";
+							view.style.width = (aspect*window.innerHeight)+"px";
+							view.style.marginLeft = ((sw-(aspect*window.innerHeight))>>1)+"px";
+							view.style.marginTop = 0;
+						}
+						
+						for(var n=0; n<MAX_TEXTURE; n++) {
+							update(context[n],points[n],n);
 						}
 					}
 					
@@ -531,25 +717,63 @@
 						tid = setTimeout((e)=>resize(),15);
 					});
 					
+					
 					resize();
-					document.body.appendChild(div);
-					
-					document.body.appendChild(document.getElementById("GUI"));
-					document.getElementById("GUI").appendChild(GUI.canvas);
 					
 					
+					const draw = function (e) {
+						
+						gl.viewport(0,0,TEXTURE_SIZE[0],TEXTURE_SIZE[1]);
+						gl.enable(gl.DEPTH_TEST);
+						
+						gl.clearColor(0.0,0.0,0.0,0.0);
+						gl.clear(gl.COLOR_BUFFER_BIT|gl.DEPTH_BUFFER_BIT);
+						
+						gl.useProgram(program);
+						twgl.setBuffersAndAttributes(gl,programInfo,bufferInfo);
+						twgl.setUniforms(programInfo,uniforms);
+						gl.drawElements(gl.TRIANGLES,bufferInfo.numElements,gl.UNSIGNED_SHORT,0);
+					}
 					
-					//document.body.appendChild(GUI.canvas);
+					
+					setInterval(draw,33);
+					draw();
+					
+					document.body.appendChild(view);
 					
 				}
+			};
+			
+			
+			if("onmousedown" in document.documentElement) {
+				
+				const img = new Image();
+				img.onload = (e)=>{
+					if(e.target.naturalWidth%TEXTURE_SIZE[0]==0&&e.target.naturalHeight%TEXTURE_SIZE[1]==0) {
+						
+						load(e.target);
+					}
+					else {
+						const p = document.createElement("p");
+						p.textContent = TEXTURE_URL+" is not supported.";
+						document.body.appendChild(p);
+					}
+				}
+				img.onerror = ()=>{
+					const p = document.createElement("p");
+					p.textContent = TEXTURE_URL+" is not loaded.";
+					document.body.appendChild(p);
+				};
+				img.src = TEXTURE_URL; 
+			
 			}
 			else {
 				
 				const p = document.createElement("p");
 				p.textContent = "This device is not supported.";
 				document.body.appendChild(p);
-				
 			}
+			
 			
 		</script>
 	</body>
