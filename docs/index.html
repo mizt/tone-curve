@@ -48,6 +48,8 @@
 	<body>
 		<script src="./twgl.min.js"></script>
 		<script>
+			
+			
 
 			const TEXTURE_URL = "./1738237323.jpg";
 			
@@ -632,6 +634,7 @@
 							onMouseUp();
 						}
 					};
+										
 					
 					for(var n=0; n<MAX_TEXTURE; n++) {
 						canvas[n] = document.createElement("canvas");
@@ -641,10 +644,21 @@
 						
 						context[n] = canvas[n].getContext("2d");
 						points[n] = [[0,1],[1,0]]; 
-						
+						canvas[n].oncontextmenu = function () {return false;}
 						canvas[n].addEventListener("mousedown",function(e) {
-							target.canvas = this;
-							onMouseDown(e.pageX,e.pageY);
+														
+							if(e.button===0) {
+								target.canvas = this;
+								onMouseDown(e.pageX,e.pageY);
+							}
+							else if(e.button===2) {
+								if(navigator.clipboard) {
+									const index = getIndex(this);
+									const curve = JSON.stringify(points[index]).replace(/\[/g,"{").replace(/\]/g,"}");
+									//console.log(curve);
+									navigator.clipboard.writeText(curve);
+								}
+							}
 						});
 						
 						update(context[n],points[n],n);
