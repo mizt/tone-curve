@@ -656,7 +656,7 @@
 									const index = getIndex(this);
 									const curve = JSON.stringify(points[index]).replace(/\[/g,"{").replace(/\]/g,"}");
 									//console.log(curve);
-									navigator.clipboard.writeText(curve);
+									navigator.clipboard.writeText("std::vector<std::array<float,2>> curve = "+curve+";");
 								}
 							}
 						});
